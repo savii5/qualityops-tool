@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0F1923">
+<title>QualityOps — Field Inspection & Analytics</title>
+<link rel="manifest" href="manifest.json">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+--navy:#0F1923;--navy2:#172A3A;--navy3:#1E3448;
+--teal:#1D9E75;--teal-l:#D4F0E7;--teal-d:#085041;
+--blue:#2563A8;--blue-l:#E6F1FB;--blue-d:#0C447C;
+--red:#D63031;--red-l:#FCEBEB;--red-d:#791F1F;
+--amber:#EF9F27;--amber-l:#FAEEDA;--amber-d:#633806;
+--bg:#F5F3EE;--card:#FFFFFF;--border:#E5E2DA;
+--text:#1A1A1A;--text2:#6B6660;--text3:#9E9A94;
+--font:'DM Sans',system-ui,sans-serif;
+--mono:'JetBrains Mono',monospace;
+--radius:12px;--radius-sm:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+button{font-family:var(--font);cursor:pointer;border:none;background:none}
+input,select,textarea{font-family:var(--font);border:none;background:none}
+
+/* Top bar */
+.topbar{background:var(--navy);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:100}
+.topbar-brand{display:flex;align-items:center;gap:8px}
+.topbar-logo{width:28px;height:28px;background:var(--teal);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#fff}
+.topbar-name{font-size:14px;font-weight:500;color:#fff}
+.topbar-sub{font-size:11px;color:rgba(255,255,255,.5)}
+.mode-switch{display:flex;background:var(--navy2);border-radius:20px;padding:2px}
+.mode-btn{padding:6px 14px;border-radius:18px;font-size:12px;font-weight:500;color:rgba(255,255,255,.5);transition:all .2s}
+.mode-btn.active{background:var(--teal);color:#fff}
+
+/* Bottom nav */
+.bottomnav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:0.5px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:100;padding-bottom:env(safe-area-inset-bottom)}
+.bottomnav.analytics-nav{grid-template-columns:repeat(4,1fr)}
+.nav-item{display:flex;flex-direction:column;align-items:center;padding:8px 4px;gap:2px;font-size:10px;color:var(--text3);transition:color .15s}
+.nav-item.active{color:var(--teal)}
+.nav-item svg{width:20px;height:20px}
+
+/* Screens */
+.screen{display:none;padding:12px 16px 80px;max-width:480px;margin:0 auto}
+.screen.active{display:block}
+
+/* Cards */
+.card{background:var(--card);border-radius:var(--radius);border:0.5px solid var(--border);padding:16px;margin-bottom:12px}
+.card-sm{padding:12px}
+.card-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.card-title .dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:var(--bg);border-radius:var(--radius-sm);padding:12px}
+.stat-val{font-size:22px;font-weight:600;color:var(--text);letter-spacing:-.02em}
+.stat-label{font-size:11px;color:var(--text3);margin-top:2px}
+.stat-delta{font-size:11px;margin-top:3px}
+.stat-up{color:var(--teal)}
+.stat-down{color:var(--red)}
+
+/* Form elements */
+.field{margin-bottom:12px}
+.field label{font-size:12px;font-weight:500;color:var(--text2);display:block;margin-bottom:4px}
+.field input,.field select{width:100%;padding:10px 12px;border:0.5px solid var(--border);border-radius:var(--radius-sm);font-size:14px;color:var(--text);background:var(--card);transition:border-color .15s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--teal)}
+
+/* Defect counter */
+.defect-item{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.defect-item:last-child{border-bottom:none}
+.defect-info{flex:1}
+.defect-name{font-size:13px;font-weight:500;color:var(--text)}
+.defect-type{font-size:11px;display:inline-block;padding:1px 7px;border-radius:20px;margin-top:3px}
+.type-critical{background:var(--red-l);color:var(--red-d)}
+.type-major{background:var(--amber-l);color:var(--amber-d)}
+.type-minor{background:var(--blue-l);color:var(--blue-d)}
+.counter{display:flex;align-items:center;gap:6px}
+.cnt-btn{width:32px;height:32px;border-radius:50%;border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--text2);background:var(--card);transition:all .15s;-webkit-tap-highlight-color:transparent}
+.cnt-btn:active{background:var(--bg);transform:scale(.95)}
+.cnt-val{width:28px;text-align:center;font-size:16px;font-weight:600;font-family:var(--mono)}
+
+/* Verdict */
+.verdict{border-radius:var(--radius);padding:16px;text-align:center;margin:12px 0}
+.verdict-pass{background:var(--teal-l);border:0.5px solid #1D9E7533}
+.verdict-fail{background:var(--red-l);border:0.5px solid #D6303133}
+.verdict-pending{background:var(--bg);border:0.5px solid var(--border)}
+.verdict-text{font-size:18px;font-weight:600}
+.verdict-pass .verdict-text{color:var(--teal-d)}
+.verdict-fail .verdict-text{color:var(--red-d)}
+.verdict-pending .verdict-text{color:var(--text3)}
+.verdict-sub{font-size:12px;margin-top:4px}
+.verdict-pass .verdict-sub{color:var(--teal)}
+.verdict-fail .verdict-sub{color:var(--red)}
+.verdict-pending .verdict-sub{color:var(--text3)}
+
+/* SOP Checklist */
+.sop-item{display:flex;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border)}
+.sop-item:last-child{border-bottom:none}
+.sop-check{width:22px;height:22px;border-radius:6px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;transition:all .15s;-webkit-tap-highlight-color:transparent;cursor:pointer}
+.sop-check.done{background:var(--teal);border-color:var(--teal);color:#fff;font-size:12px}
+.sop-text{font-size:13px;line-height:1.5;color:var(--text)}
+.sop-cat{font-size:10px;color:var(--text3);margin-top:2px;text-transform:uppercase;letter-spacing:.04em}
+
+/* Progress */
+.progress{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin:8px 0}
+.progress-fill{height:100%;border-radius:2px;background:var(--teal);transition:width .3s}
+
+/* Report */
+.rpt-row{display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:0.5px solid var(--border)}
+.rpt-row:last-child{border-bottom:none}
+.rpt-key{color:var(--text2)}
+.rpt-val{font-weight:500;color:var(--text)}
+
+/* Primary button */
+.btn-primary{width:100%;padding:14px;background:var(--navy);color:#fff;border-radius:var(--radius-sm);font-size:14px;font-weight:500;transition:all .15s;-webkit-tap-highlight-color:transparent}
+.btn-primary:active{transform:scale(.98);opacity:.9}
+.btn-secondary{width:100%;padding:12px;background:var(--bg);color:var(--text);border:0.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;margin-top:8px}
+
+/* Analytics */
+.risk-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:500}
+.risk-high{background:var(--red-l);color:var(--red-d)}
+.risk-med{background:var(--amber-l);color:var(--amber-d)}
+.risk-low{background:var(--teal-l);color:var(--teal-d)}
+
+.factory-row{padding:10px 0;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.factory-row:last-child{border-bottom:none}
+.factory-name{font-size:13px;font-weight:500;color:var(--text)}
+.factory-meta{font-size:11px;color:var(--text3);margin-top:2px}
+
+.bar-h{height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin:4px 0}
+.bar-h-fill{height:100%;border-radius:3px;transition:width .4s}
+
+/* Defect pattern */
+.pattern-item{padding:8px 0;border-bottom:0.5px solid var(--border)}
+.pattern-item:last-child{border-bottom:none}
+.pattern-header{display:flex;justify-content:space-between;align-items:center}
+.pattern-name{font-size:13px;font-weight:500}
+.pattern-count{font-size:13px;font-weight:600;font-family:var(--mono)}
+.pattern-bar{margin-top:4px}
+
+/* Cost card */
+.cost-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:0.5px solid var(--border)}
+.cost-row:last-child{border-bottom:none}
+.cost-label{font-size:13px;color:var(--text2)}
+.cost-val{font-size:14px;font-weight:600;font-family:var(--mono)}
+
+/* Section header */
+.sec-hdr{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin:16px 0 8px}
+
+/* Scenario slider */
+.scenario-slider{margin:8px 0}
+.scenario-slider input[type=range]{width:100%;height:4px;-webkit-appearance:none;background:var(--border);border-radius:2px;outline:none}
+.scenario-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;background:var(--teal);border-radius:50%;cursor:pointer}
+.scenario-label{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:4px}
+
+/* Toast */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(100px);background:var(--navy);color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:500;z-index:200;opacity:0;transition:all .3s}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.card{animation:fadeUp .3s ease}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo">Q</div>
+    <div>
+      <div class="topbar-name">QualityOps</div>
+      <div class="topbar-sub" id="topbar-context">Field inspection & analytics</div>
+    </div>
+  </div>
+  <div class="mode-switch">
+    <button class="mode-btn active" onclick="switchMode('field')">Field</button>
+    <button class="mode-btn" onclick="switchMode('analytics')">Analytics</button>
+  </div>
+</div>
+
+<!-- ═══════════ FIELD MODE ═══════════ -->
+
+<!-- Setup -->
+<div id="f-setup" class="screen active" data-mode="field">
+  <div class="sec-hdr">Inspection setup</div>
+  <div class="card">
+    <div class="field"><label>Factory name</label><input type="text" id="f-factory" value="Nam Phu Garments" oninput="updateContext()"></div>
+    <div class="field"><label>Client</label><input type="text" id="f-client" value="EU Retailer A"></div>
+    <div class="field"><label>Product type</label><input type="text" id="f-product" value="Knitwear"></div>
+    <div class="field"><label>Inspector</label><input type="text" id="f-inspector" value="Savio"></div>
+    <div class="field"><label>Date</label><input type="text" id="f-date" value=""></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>AQL parameters</div>
+    <div class="field"><label>Lot size (units)</label><input type="number" id="f-lot" value="3000" oninput="calcSetup()"></div>
+    <div class="field"><label>Inspection level</label>
+      <select id="f-level" onchange="calcSetup()">
+        <option value="I">Level I — reduced</option>
+        <option value="II" selected>Level II — normal</option>
+        <option value="III">Level III — tightened</option>
+      </select>
+    </div>
+    <div class="stat-grid" style="margin-top:12px">
+      <div class="stat-card"><div class="stat-val" id="f-sample">200</div><div class="stat-label">Sample size</div></div>
+      <div class="stat-card"><div class="stat-val" id="f-code">L</div><div class="stat-label">Code letter</div></div>
+    </div>
+    <div style="background:var(--teal-l);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--teal-d);line-height:1.5" id="f-guidance">
+      Pull 200 units randomly across all pallets. Do not let factory staff select units.
+    </div>
+  </div>
+  <button class="btn-primary" onclick="goField('f-inspect')">Start inspection →</button>
+</div>
+
+<!-- Inspect -->
+<div id="f-inspect" class="screen" data-mode="field">
+  <div class="sec-hdr">Defect tracking</div>
+  <div class="card card-sm">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:12px;font-weight:500;color:var(--text2)">Units inspected</span>
+      <span style="font-size:12px;color:var(--text3)">Target: <strong id="f-sample2">200</strong></span>
+    </div>
+    <input type="number" id="f-units" value="0" min="0" oninput="updateVerdict()" style="width:100%;text-align:center;font-size:24px;font-weight:600;padding:8px;border:0.5px solid var(--border);border-radius:var(--radius-sm);background:var(--card)">
+    <div class="progress"><div class="progress-fill" id="f-prog" style="width:0%"></div></div>
+    <div style="font-size:11px;color:var(--text3);text-align:center" id="f-prog-text">0 of 200</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--red)"></span>Defect log</div>
+    <div id="defect-list"></div>
+  </div>
+
+  <div class="card card-sm">
+    <div class="card-title">Live tally</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val" id="t-crit" style="color:var(--red)">0</div><div class="stat-label">Critical · Ac: 0</div></div>
+      <div class="stat-card"><div class="stat-val" id="t-maj" style="color:var(--amber)">0</div><div class="stat-label">Major · <span id="t-maj-ac">Ac: 10</span></div></div>
+    </div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val" id="t-min" style="color:var(--blue)">0</div><div class="stat-label">Minor · <span id="t-min-ac">Ac: 14</span></div></div>
+      <div class="stat-card"><div class="stat-val" id="t-rate">0.0%</div><div class="stat-label">Defect rate</div></div>
+    </div>
+  </div>
+
+  <div class="verdict verdict-pending" id="f-verdict">
+    <div class="verdict-text" id="f-verdict-text">Pending</div>
+    <div class="verdict-sub" id="f-verdict-sub">Enter units inspected to calculate</div>
+  </div>
+  <button class="btn-primary" onclick="goField('f-sop')">Next: SOP checklist →</button>
+</div>
+
+<!-- SOP -->
+<div id="f-sop" class="screen" data-mode="field">
+  <div class="sec-hdr">SOP compliance checklist</div>
+  <div class="card card-sm">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;font-weight:500;color:var(--text2)">Completion</span>
+      <span style="font-size:13px;font-weight:600" id="sop-pct">0%</span>
+    </div>
+    <div class="progress"><div class="progress-fill" id="sop-prog" style="width:0%"></div></div>
+    <div style="font-size:11px;color:var(--text3)" id="sop-count">0 of 12 items</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--navy)"></span>Pre-inspection</div>
+    <div id="sop-pre"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>During inspection</div>
+    <div id="sop-during"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--blue)"></span>Photo evidence</div>
+    <div id="sop-photo"></div>
+  </div>
+  <button class="btn-primary" onclick="goField('f-report')">Generate report →</button>
+</div>
+
+<!-- Report -->
+<div id="f-report" class="screen" data-mode="field">
+  <div class="sec-hdr">Inspection report</div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--navy)"></span>Details</div>
+    <div id="rpt-details"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>AQL results</div>
+    <div id="rpt-aql"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--blue)"></span>SOP compliance</div>
+    <div id="rpt-sop"></div>
+  </div>
+  <div class="verdict" id="rpt-verdict">
+    <div class="verdict-text" id="rpt-verdict-text">—</div>
+    <div class="verdict-sub" id="rpt-verdict-sub">—</div>
+  </div>
+  <div class="card">
+    <div class="card-title">Notes</div>
+    <textarea id="rpt-notes" rows="3" style="width:100%;padding:10px;border:0.5px solid var(--border);border-radius:var(--radius-sm);font-size:13px;resize:none;color:var(--text);background:var(--card)" placeholder="Add observations..."></textarea>
+  </div>
+  <button class="btn-primary" onclick="saveInspection()">Save inspection</button>
+  <button class="btn-secondary" onclick="resetField()">New inspection</button>
+</div>
+
+<!-- ═══════════ ANALYTICS MODE ═══════════ -->
+
+<!-- Dashboard -->
+<div id="a-dash" class="screen" data-mode="analytics">
+  <div class="sec-hdr">Overview — all inspections</div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val" id="a-total">0</div><div class="stat-label">Total inspections</div></div>
+    <div class="stat-card"><div class="stat-val" id="a-pass-rate">—</div><div class="stat-label">Pass rate</div></div>
+  </div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val" id="a-avg-defect">—</div><div class="stat-label">Avg defect rate</div></div>
+    <div class="stat-card"><div class="stat-val" id="a-critical">0</div><div class="stat-label">Critical defects</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--red)"></span>Defect patterns</div>
+    <div id="a-patterns">
+      <div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center">No inspection data yet. Complete inspections in field mode to see patterns.</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Recent inspections</div>
+    <div id="a-recent">
+      <div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center">No inspections recorded yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Factory Risk -->
+<div id="a-risk" class="screen" data-mode="analytics">
+  <div class="sec-hdr">Factory risk scoring</div>
+  <div class="stat-grid">
+    <div class="stat-card"><div class="stat-val" id="r-high" style="color:var(--red)">0</div><div class="stat-label">High risk</div></div>
+    <div class="stat-card"><div class="stat-val" id="r-med" style="color:var(--amber)">0</div><div class="stat-label">Medium risk</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--red)"></span>Factory risk register</div>
+    <div id="r-factories">
+      <div style="font-size:13px;color:var(--text3);padding:12px 0;text-align:center">Run inspections to build factory risk profiles.</div>
+    </div>
+  </div>
+</div>
+
+<!-- AQL Scenarios -->
+<div id="a-scenario" class="screen" data-mode="analytics">
+  <div class="sec-hdr">AQL scenario simulator</div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--blue)"></span>What-if analysis</div>
+    <div class="field"><label>Lot size</label><input type="number" id="sc-lot" value="3000" oninput="runScenario()"></div>
+    <div class="field"><label>Current defect rate %</label>
+      <div class="scenario-slider">
+        <input type="range" min="0" max="10" step="0.1" value="2.5" id="sc-rate" oninput="runScenario()">
+        <div class="scenario-label"><span>0%</span><span id="sc-rate-val">2.5%</span><span>10%</span></div>
+      </div>
+    </div>
+    <div class="field"><label>AQL level for major defects</label>
+      <select id="sc-aql" onchange="runScenario()">
+        <option value="1.0">AQL 1.0 — tighter</option>
+        <option value="2.5" selected>AQL 2.5 — standard</option>
+        <option value="4.0">AQL 4.0 — relaxed</option>
+        <option value="6.5">AQL 6.5 — very relaxed</option>
+      </select>
+    </div>
+  </div>
+  <div class="card" id="sc-results">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Scenario result</div>
+    <div id="sc-output"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--navy)"></span>ISO 2859-1 reference</div>
+    <div style="font-size:12px;color:var(--text2);overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead><tr style="border-bottom:1px solid var(--border)">
+          <th style="text-align:left;padding:6px 4px;color:var(--text3);font-weight:500">Lot size</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--text3);font-weight:500">Sample</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--text3);font-weight:500">Maj 2.5</th>
+          <th style="text-align:center;padding:6px 4px;color:var(--text3);font-weight:500">Min 4.0</th>
+        </tr></thead>
+        <tbody id="aql-ref-table"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Cost of Quality -->
+<div id="a-cost" class="screen" data-mode="analytics">
+  <div class="sec-hdr">Cost of quality calculator</div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Input assumptions</div>
+    <div class="field"><label>Cost per inspection ($)</label><input type="number" id="cq-insp" value="300" oninput="calcCost()"></div>
+    <div class="field"><label>Cost of failed shipment ($)</label><input type="number" id="cq-fail" value="8000" oninput="calcCost()"></div>
+    <div class="field"><label>Cost of re-inspection ($)</label><input type="number" id="cq-reinsp" value="450" oninput="calcCost()"></div>
+    <div class="field"><label>Monthly inspections</label><input type="number" id="cq-monthly" value="20" oninput="calcCost()"></div>
+    <div class="field"><label>Current fail rate %</label>
+      <div class="scenario-slider">
+        <input type="range" min="0" max="30" step="1" value="12" id="cq-failrate" oninput="calcCost()">
+        <div class="scenario-label"><span>0%</span><span id="cq-failrate-val">12%</span><span>30%</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card" id="cq-results">
+    <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Cost analysis</div>
+    <div id="cq-output"></div>
+  </div>
+  <div class="card">
+    <div class="card-title"><span class="dot" style="background:var(--navy)"></span>Insight</div>
+    <div id="cq-insight" style="font-size:13px;color:var(--text2);line-height:1.6"></div>
+  </div>
+</div>
+
+<!-- Bottom Navs -->
+<div class="bottomnav" id="field-nav">
+  <button class="nav-item active" onclick="goField('f-setup')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+    Setup
+  </button>
+  <button class="nav-item" onclick="goField('f-inspect')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+    Inspect
+  </button>
+  <button class="nav-item" onclick="goField('f-sop')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+    SOP
+  </button>
+  <button class="nav-item" onclick="goField('f-report')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+    Report
+  </button>
+</div>
+
+<div class="bottomnav analytics-nav" id="analytics-nav" style="display:none">
+  <button class="nav-item active" onclick="goAnalytics('a-dash')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z"/></svg>
+    Overview
+  </button>
+  <button class="nav-item" onclick="goAnalytics('a-risk')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+    Risk
+  </button>
+  <button class="nav-item" onclick="goAnalytics('a-scenario')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/></svg>
+    Scenarios
+  </button>
+  <button class="nav-item" onclick="goAnalytics('a-cost')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    Cost
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── AQL Tables ──
+const AQL_TABLE={
+  I:[{max:150,code:"A",size:2},{max:280,code:"B",size:3},{max:500,code:"C",size:5},{max:1200,code:"D",size:8},{max:3200,code:"E",size:13},{max:10000,code:"F",size:20},{max:35000,code:"G",size:32},{max:1e9,code:"H",size:50}],
+  II:[{max:150,code:"E",size:13},{max:280,code:"F",size:20},{max:500,code:"G",size:32},{max:1200,code:"H",size:50},{max:3200,code:"J",size:80},{max:10000,code:"K",size:125},{max:35000,code:"L",size:200},{max:1e9,code:"M",size:315}],
+  III:[{max:150,code:"F",size:20},{max:280,code:"G",size:32},{max:500,code:"H",size:50},{max:1200,code:"J",size:80},{max:3200,code:"K",size:125},{max:10000,code:"L",size:200},{max:35000,code:"M",size:315},{max:1e9,code:"N",size:500}]
+};
+const MAJ_AC={2:0,3:0,5:0,8:0,13:1,20:1,32:2,50:3,80:5,125:7,200:10,315:14,500:21};
+const MIN_AC={2:0,3:0,5:0,8:1,13:1,20:2,32:3,50:5,80:7,125:10,200:14,315:21,500:21};
+const MAJ_AC_1={2:0,3:0,5:0,8:0,13:0,20:0,32:1,50:1,80:2,125:3,200:5,315:7,500:10};
+const MAJ_AC_4={2:0,3:0,5:0,8:1,13:1,20:2,32:3,50:5,80:7,125:10,200:14,315:21,500:21};
+const MAJ_AC_6={2:0,3:0,5:1,8:1,13:2,20:3,32:5,50:7,80:10,125:14,200:21,315:21,500:21};
+
+function getSample(){
+  const lot=parseInt(document.getElementById('f-lot').value)||0;
+  const lvl=document.getElementById('f-level').value;
+  const tbl=AQL_TABLE[lvl]||AQL_TABLE.II;
+  for(const r of tbl)if(lot<=r.max)return r;
+  return tbl[tbl.length-1];
+}
+
+// ── State ──
+let inspections=JSON.parse(localStorage.getItem('qops_inspections')||'[]');
+let currentDefects=[];
+
+const DEFECTS=[
+  {name:"Sharp or exposed edge",type:"critical"},
+  {name:"Choking hazard (small part)",type:"critical"},
+  {name:"Toxic material detected",type:"critical"},
+  {name:"Visible stitching defect",type:"major"},
+  {name:"Colour mismatch vs sample",type:"major"},
+  {name:"Label incorrect or missing",type:"major"},
+  {name:"Zipper / button malfunction",type:"major"},
+  {name:"Dimensions out of spec",type:"major"},
+  {name:"Loose thread (interior)",type:"minor"},
+  {name:"Minor surface mark",type:"minor"},
+  {name:"Slight colour variation",type:"minor"},
+  {name:"Packaging cosmetic damage",type:"minor"},
+];
+
+const SOP_ITEMS=[
+  {text:"Client brief received and read",cat:"Preparation"},
+  {text:"AQL level and sample size confirmed",cat:"Preparation"},
+  {text:"Reference sample or approved photos loaded",cat:"Preparation"},
+  {text:"Sample pulled randomly — not selected by factory",cat:"AQL methodology"},
+  {text:"All defects classified correctly (Critical/Major/Minor)",cat:"Defect classification"},
+  {text:"Seal verification on all sampled cartons",cat:"Packaging"},
+  {text:"Dimensions and weight spot-checked vs spec",cat:"Specification"},
+  {text:"Barcode and label accuracy verified on 5+ units",cat:"Labelling"},
+  {text:"Overall product shot (clear, well-lit)",cat:"Photo evidence"},
+  {text:"Label and barcode close-up (text readable)",cat:"Photo evidence"},
+  {text:"Defect close-up for every defect type found",cat:"Photo evidence"},
+  {text:"All photos uploaded within 4h of inspection",cat:"SLA"},
+];
+
+// ── Init ──
+function init(){
+  document.getElementById('f-date').value=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  buildDefectList();
+  buildSOPList();
+  calcSetup();
+  buildAQLRef();
+  runScenario();
+  calcCost();
+  refreshAnalytics();
+}
+
+function buildDefectList(){
+  const el=document.getElementById('defect-list');
+  currentDefects=DEFECTS.map(d=>({...d,count:0}));
+  el.innerHTML=currentDefects.map((d,i)=>`
+    <div class="defect-item">
+      <div class="defect-info">
+        <div class="defect-name">${d.name}</div>
+        <span class="defect-type type-${d.type}">${d.type}</span>
+      </div>
+      <div class="counter">
+        <button class="cnt-btn" onclick="changeDefect(${i},-1)">−</button>
+        <span class="cnt-val" id="dc-${i}">0</span>
+        <button class="cnt-btn" onclick="changeDefect(${i},1)">+</button>
+      </div>
+    </div>`).join('');
+}
+
+function buildSOPList(){
+  const groups={pre:[],during:[],photo:[]};
+  SOP_ITEMS.forEach((s,i)=>{
+    const html=`<div class="sop-item"><div class="sop-check" onclick="toggleSOP(this)" id="sop-${i}"></div><div><div class="sop-text">${s.text}</div><div class="sop-cat">${s.cat}</div></div></div>`;
+    if(s.cat==='Preparation')groups.pre.push(html);
+    else if(s.cat.includes('Photo')||s.cat==='SLA')groups.photo.push(html);
+    else groups.during.push(html);
+  });
+  document.getElementById('sop-pre').innerHTML=groups.pre.join('');
+  document.getElementById('sop-during').innerHTML=groups.during.join('');
+  document.getElementById('sop-photo').innerHTML=groups.photo.join('');
+}
+
+function calcSetup(){
+  const s=getSample();
+  document.getElementById('f-sample').textContent=s.size;
+  document.getElementById('f-sample2').textContent=s.size;
+  document.getElementById('f-code').textContent=s.code;
+  document.getElementById('f-guidance').textContent=`Pull ${s.size} units randomly across all pallets and locations. Do not let factory staff select which units to present.`;
+  document.getElementById('t-maj-ac').textContent=`Ac: ${MAJ_AC[s.size]??'—'}`;
+  document.getElementById('t-min-ac').textContent=`Ac: ${MIN_AC[s.size]??'—'}`;
+  updateVerdict();
+}
+
+function changeDefect(i,delta){
+  currentDefects[i].count=Math.max(0,currentDefects[i].count+delta);
+  document.getElementById('dc-'+i).textContent=currentDefects[i].count;
+  updateVerdict();
+}
+
+function getTotals(){
+  let crit=0,maj=0,min=0;
+  currentDefects.forEach(d=>{
+    if(d.type==='critical')crit+=d.count;
+    else if(d.type==='major')maj+=d.count;
+    else min+=d.count;
+  });
+  return{crit,maj,min,total:crit+maj+min};
+}
+
+function updateVerdict(){
+  const{crit,maj,min,total}=getTotals();
+  const s=getSample();
+  const units=parseInt(document.getElementById('f-units').value)||0;
+  const majAc=MAJ_AC[s.size]??0;
+  const minAc=MIN_AC[s.size]??0;
+
+  document.getElementById('t-crit').textContent=crit;
+  document.getElementById('t-maj').textContent=maj;
+  document.getElementById('t-min').textContent=min;
+  const pct=units>0?((total/units)*100).toFixed(1)+'%':'0.0%';
+  document.getElementById('t-rate').textContent=pct;
+
+  const prog=Math.min(100,Math.round((units/s.size)*100));
+  document.getElementById('f-prog').style.width=prog+'%';
+  document.getElementById('f-prog-text').textContent=`${units} of ${s.size}`;
+
+  const vb=document.getElementById('f-verdict');
+  const vt=document.getElementById('f-verdict-text');
+  const vs=document.getElementById('f-verdict-sub');
+
+  if(units===0){
+    vb.className='verdict verdict-pending';vt.textContent='Pending';vs.textContent='Enter units inspected';return;
+  }
+  const fail=crit>0||maj>majAc||min>minAc;
+  if(fail){
+    vb.className='verdict verdict-fail';
+    const r=[];
+    if(crit>0)r.push(`${crit} critical (Ac: 0)`);
+    if(maj>majAc)r.push(`${maj} major (Ac: ${majAc})`);
+    if(min>minAc)r.push(`${min} minor (Ac: ${minAc})`);
+    vt.textContent='FAIL — Do not ship';vs.textContent='Exceeds: '+r.join(' · ');
+  }else{
+    vb.className='verdict verdict-pass';
+    vt.textContent='PASS — Approved';vs.textContent=`${total} defects · Within AQL thresholds`;
+  }
+}
+
+function toggleSOP(el){
+  el.classList.toggle('done');
+  el.textContent=el.classList.contains('done')?'✓':'';
+  const all=document.querySelectorAll('.sop-check').length;
+  const done=document.querySelectorAll('.sop-check.done').length;
+  const pct=Math.round((done/all)*100);
+  document.getElementById('sop-prog').style.width=pct+'%';
+  document.getElementById('sop-pct').textContent=pct+'%';
+  document.getElementById('sop-count').textContent=`${done} of ${all} items`;
+}
+
+function updateContext(){
+  const f=document.getElementById('f-factory').value||'Ready';
+  document.getElementById('topbar-context').textContent=f;
+}
+
+// ── Navigation ──
+function switchMode(mode){
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active'));
+  event.target.classList.add('active');
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  if(mode==='field'){
+    document.getElementById('field-nav').style.display='grid';
+    document.getElementById('analytics-nav').style.display='none';
+    document.getElementById('f-setup').classList.add('active');
+    document.querySelectorAll('#field-nav .nav-item').forEach((n,i)=>{n.classList.toggle('active',i===0)});
+  }else{
+    document.getElementById('field-nav').style.display='none';
+    document.getElementById('analytics-nav').style.display='grid';
+    document.getElementById('a-dash').classList.add('active');
+    document.querySelectorAll('#analytics-nav .nav-item').forEach((n,i)=>{n.classList.toggle('active',i===0)});
+    refreshAnalytics();
+  }
+}
+
+function goField(id){
+  document.querySelectorAll('.screen[data-mode=field]').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const tabs=['f-setup','f-inspect','f-sop','f-report'];
+  document.querySelectorAll('#field-nav .nav-item').forEach((n,i)=>{n.classList.toggle('active',tabs[i]===id)});
+  if(id==='f-report')buildReport();
+  window.scrollTo(0,0);
+}
+
+function goAnalytics(id){
+  document.querySelectorAll('.screen[data-mode=analytics]').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const tabs=['a-dash','a-risk','a-scenario','a-cost'];
+  document.querySelectorAll('#analytics-nav .nav-item').forEach((n,i)=>{n.classList.toggle('active',tabs[i]===id)});
+  window.scrollTo(0,0);
+}
+
+// ── Report ──
+function buildReport(){
+  const s=getSample();
+  const{crit,maj,min,total}=getTotals();
+  const units=parseInt(document.getElementById('f-units').value)||0;
+  const pct=units>0?((total/units)*100).toFixed(1)+'%':'—';
+  const majAc=MAJ_AC[s.size]??0;const minAc=MIN_AC[s.size]??0;
+  const fail=crit>0||maj>majAc||min>minAc;
+  const sopAll=document.querySelectorAll('.sop-check').length;
+  const sopDone=document.querySelectorAll('.sop-check.done').length;
+
+  document.getElementById('rpt-details').innerHTML=[
+    ['Factory',document.getElementById('f-factory').value],
+    ['Client',document.getElementById('f-client').value],
+    ['Product',document.getElementById('f-product').value],
+    ['Inspector',document.getElementById('f-inspector').value],
+    ['Date',document.getElementById('f-date').value],
+    ['AQL Level','Level '+document.getElementById('f-level').value],
+  ].map(([k,v])=>`<div class="rpt-row"><span class="rpt-key">${k}</span><span class="rpt-val">${v}</span></div>`).join('');
+
+  document.getElementById('rpt-aql').innerHTML=[
+    ['Lot size',(parseInt(document.getElementById('f-lot').value)||0).toLocaleString()],
+    ['Sample size',s.size],
+    ['Units inspected',units],
+    ['Critical defects',`${crit} (Ac: 0)`],
+    ['Major defects',`${maj} (Ac: ${majAc})`],
+    ['Minor defects',`${min} (Ac: ${minAc})`],
+    ['Defect rate',pct],
+  ].map(([k,v])=>`<div class="rpt-row"><span class="rpt-key">${k}</span><span class="rpt-val">${v}</span></div>`).join('');
+
+  document.getElementById('rpt-sop').innerHTML=[
+    ['Items completed',`${sopDone} / ${sopAll}`],
+    ['SOP score',`${Math.round((sopDone/sopAll)*100)}%`],
+  ].map(([k,v])=>`<div class="rpt-row"><span class="rpt-key">${k}</span><span class="rpt-val">${v}</span></div>`).join('');
+
+  const vb=document.getElementById('rpt-verdict');
+  const vt=document.getElementById('rpt-verdict-text');
+  const vs=document.getElementById('rpt-verdict-sub');
+  if(units===0){vb.className='verdict verdict-pending';vt.textContent='Incomplete';vs.textContent='No units recorded';}
+  else if(fail){vb.className='verdict verdict-fail';vt.textContent='FAIL — Do not ship';vs.textContent='Notify client and factory immediately';}
+  else{vb.className='verdict verdict-pass';vt.textContent='PASS — Approved for shipment';vs.textContent='All AQL thresholds met';}
+}
+
+function saveInspection(){
+  const s=getSample();
+  const{crit,maj,min,total}=getTotals();
+  const units=parseInt(document.getElementById('f-units').value)||0;
+  const majAc=MAJ_AC[s.size]??0;const minAc=MIN_AC[s.size]??0;
+  const fail=crit>0||maj>majAc||min>minAc;
+  const sopAll=document.querySelectorAll('.sop-check').length;
+  const sopDone=document.querySelectorAll('.sop-check.done').length;
+
+  const record={
+    id:Date.now(),
+    factory:document.getElementById('f-factory').value,
+    client:document.getElementById('f-client').value,
+    product:document.getElementById('f-product').value,
+    inspector:document.getElementById('f-inspector').value,
+    date:document.getElementById('f-date').value,
+    lot:parseInt(document.getElementById('f-lot').value)||0,
+    sample:s.size,units,crit,maj,min,total,
+    defectRate:units>0?((total/units)*100):0,
+    result:units===0?'Incomplete':(fail?'Fail':'Pass'),
+    sopScore:Math.round((sopDone/sopAll)*100),
+    defects:currentDefects.filter(d=>d.count>0).map(d=>({name:d.name,type:d.type,count:d.count})),
+    notes:document.getElementById('rpt-notes').value
+  };
+  inspections.push(record);
+  localStorage.setItem('qops_inspections',JSON.stringify(inspections));
+  showToast('Inspection saved');
+}
+
+function resetField(){
+  buildDefectList();
+  document.querySelectorAll('.sop-check').forEach(el=>{el.classList.remove('done');el.textContent='';});
+  document.getElementById('f-units').value='0';
+  document.getElementById('rpt-notes').value='';
+  document.getElementById('sop-prog').style.width='0%';
+  document.getElementById('sop-pct').textContent='0%';
+  document.getElementById('sop-count').textContent='0 of 12 items';
+  updateVerdict();
+  goField('f-setup');
+}
+
+// ── Analytics ──
+function refreshAnalytics(){
+  const data=inspections;
+  const n=data.length;
+  document.getElementById('a-total').textContent=n;
+  if(n===0){
+    document.getElementById('a-pass-rate').textContent='—';
+    document.getElementById('a-avg-defect').textContent='—';
+    document.getElementById('a-critical').textContent='0';
+    return;
+  }
+  const passes=data.filter(d=>d.result==='Pass').length;
+  document.getElementById('a-pass-rate').textContent=Math.round((passes/n)*100)+'%';
+  const avgDef=data.reduce((s,d)=>s+d.defectRate,0)/n;
+  document.getElementById('a-avg-defect').textContent=avgDef.toFixed(1)+'%';
+  const totalCrit=data.reduce((s,d)=>s+d.crit,0);
+  document.getElementById('a-critical').textContent=totalCrit;
+
+  // Defect patterns
+  const defectMap={};
+  data.forEach(d=>{d.defects.forEach(df=>{
+    if(!defectMap[df.name])defectMap[df.name]={count:0,type:df.type};
+    defectMap[df.name].count+=df.count;
+  })});
+  const sorted=Object.entries(defectMap).sort((a,b)=>b[1].count-a[1].count);
+  const maxCount=sorted.length?sorted[0][1].count:1;
+  if(sorted.length){
+    document.getElementById('a-patterns').innerHTML=sorted.slice(0,6).map(([name,{count,type}])=>{
+      const colors={critical:'var(--red)',major:'var(--amber)',minor:'var(--blue)'};
+      return`<div class="pattern-item"><div class="pattern-header"><span class="pattern-name">${name}</span><span class="pattern-count">${count}</span></div><div class="bar-h pattern-bar"><div class="bar-h-fill" style="width:${Math.round((count/maxCount)*100)}%;background:${colors[type]}"></div></div></div>`;
+    }).join('');
+  }
+
+  // Recent
+  const recent=data.slice(-5).reverse();
+  document.getElementById('a-recent').innerHTML=recent.map(d=>{
+    const badge=d.result==='Pass'?'risk-low':d.result==='Fail'?'risk-high':'risk-med';
+    return`<div class="factory-row"><div><div class="factory-name">${d.factory}</div><div class="factory-meta">${d.date} · ${d.inspector}</div></div><span class="risk-badge ${badge}">${d.result}</span></div>`;
+  }).join('');
+
+  // Factory risk
+  const factoryMap={};
+  data.forEach(d=>{
+    if(!factoryMap[d.factory])factoryMap[d.factory]={visits:0,passes:0,fails:0,defectRates:[],crits:0};
+    const f=factoryMap[d.factory];
+    f.visits++;
+    if(d.result==='Pass')f.passes++;
+    if(d.result==='Fail')f.fails++;
+    f.defectRates.push(d.defectRate);
+    f.crits+=d.crit;
+  });
+  const factories=Object.entries(factoryMap).map(([name,f])=>{
+    const passRate=f.visits>0?Math.round((f.passes/f.visits)*100):0;
+    const avgDR=f.defectRates.length?f.defectRates.reduce((a,b)=>a+b,0)/f.defectRates.length:0;
+    let risk='Low';
+    if(passRate<60||f.crits>0)risk='High';
+    else if(passRate<80||avgDR>3)risk='Medium';
+    return{name,passRate,avgDR,risk,visits:f.visits,crits:f.crits};
+  }).sort((a,b)=>{const o={High:0,Medium:1,Low:2};return o[a.risk]-o[b.risk]});
+
+  document.getElementById('r-high').textContent=factories.filter(f=>f.risk==='High').length;
+  document.getElementById('r-med').textContent=factories.filter(f=>f.risk==='Medium').length;
+  if(factories.length){
+    document.getElementById('r-factories').innerHTML=factories.map(f=>{
+      const badge=f.risk==='High'?'risk-high':f.risk==='Medium'?'risk-med':'risk-low';
+      const barColor=f.risk==='High'?'var(--red)':f.risk==='Medium'?'var(--amber)':'var(--teal)';
+      return`<div class="factory-row" style="flex-direction:column;align-items:stretch"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="factory-name">${f.name}</div><div class="factory-meta">${f.visits} visits · ${f.passRate}% pass rate · ${f.avgDR.toFixed(1)}% avg defect</div></div><span class="risk-badge ${badge}">${f.risk}</span></div><div class="bar-h"><div class="bar-h-fill" style="width:${f.passRate}%;background:${barColor}"></div></div></div>`;
+    }).join('');
+  }
+}
+
+// ── Scenario Simulator ──
+function runScenario(){
+  const lot=parseInt(document.getElementById('sc-lot').value)||3000;
+  const rate=parseFloat(document.getElementById('sc-rate').value);
+  const aql=document.getElementById('sc-aql').value;
+  document.getElementById('sc-rate-val').textContent=rate.toFixed(1)+'%';
+
+  const tbl=AQL_TABLE.II;
+  let sample=200,code='L';
+  for(const r of tbl){if(lot<=r.max){sample=r.size;code=r.code;break;}}
+
+  const acTable={'1.0':MAJ_AC_1,'2.5':MAJ_AC,'4.0':MAJ_AC_4,'6.5':MAJ_AC_6};
+  const ac=(acTable[aql]||MAJ_AC)[sample]??0;
+  const re=ac+1;
+  const expectedDefects=Math.round(sample*(rate/100));
+  const wouldPass=expectedDefects<=ac;
+
+  document.getElementById('sc-output').innerHTML=`
+    <div class="rpt-row"><span class="rpt-key">Sample size</span><span class="rpt-val">${sample} units (Code ${code})</span></div>
+    <div class="rpt-row"><span class="rpt-key">Expected defects in sample</span><span class="rpt-val">${expectedDefects}</span></div>
+    <div class="rpt-row"><span class="rpt-key">Accept number (Ac)</span><span class="rpt-val">${ac}</span></div>
+    <div class="rpt-row"><span class="rpt-key">Reject number (Re)</span><span class="rpt-val">${re}</span></div>
+    <div class="verdict ${wouldPass?'verdict-pass':'verdict-fail'}" style="margin-top:12px">
+      <div class="verdict-text">${wouldPass?'Would PASS':'Would FAIL'}</div>
+      <div class="verdict-sub">${wouldPass?`${expectedDefects} expected defects ≤ Ac ${ac}`:`${expectedDefects} expected defects > Ac ${ac}`}</div>
+    </div>`;
+}
+
+// ── Cost of Quality ──
+function calcCost(){
+  const inspCost=parseFloat(document.getElementById('cq-insp').value)||0;
+  const failCost=parseFloat(document.getElementById('cq-fail').value)||0;
+  const reinspCost=parseFloat(document.getElementById('cq-reinsp').value)||0;
+  const monthly=parseInt(document.getElementById('cq-monthly').value)||0;
+  const failRate=parseFloat(document.getElementById('cq-failrate').value)/100;
+  document.getElementById('cq-failrate-val').textContent=Math.round(failRate*100)+'%';
+
+  const monthlyInspCost=monthly*inspCost;
+  const expectedFails=Math.round(monthly*failRate);
+  const failCostMonthly=expectedFails*failCost;
+  const reinspCostMonthly=expectedFails*reinspCost;
+  const totalCostQuality=monthlyInspCost+failCostMonthly+reinspCostMonthly;
+
+  const tighterFailRate=Math.max(0,failRate-0.05);
+  const tighterFails=Math.round(monthly*tighterFailRate);
+  const tighterInspCost=monthly*(inspCost*1.2);
+  const tighterFailCostM=tighterFails*failCost;
+  const tighterReinspM=tighterFails*reinspCost;
+  const tighterTotal=tighterInspCost+tighterFailCostM+tighterReinspM;
+  const savings=totalCostQuality-tighterTotal;
+
+  document.getElementById('cq-output').innerHTML=`
+    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Current state</div>
+    <div class="cost-row"><span class="cost-label">Monthly inspection cost</span><span class="cost-val">$${monthlyInspCost.toLocaleString()}</span></div>
+    <div class="cost-row"><span class="cost-label">Expected failed shipments</span><span class="cost-val">${expectedFails} / month</span></div>
+    <div class="cost-row"><span class="cost-label">Cost of failures</span><span class="cost-val" style="color:var(--red)">$${failCostMonthly.toLocaleString()}</span></div>
+    <div class="cost-row"><span class="cost-label">Re-inspection cost</span><span class="cost-val">$${reinspCostMonthly.toLocaleString()}</span></div>
+    <div class="cost-row" style="border-top:1.5px solid var(--border);padding-top:10px"><span class="cost-label" style="font-weight:600;color:var(--text)">Total cost of quality</span><span class="cost-val" style="font-size:16px">$${totalCostQuality.toLocaleString()}</span></div>
+
+    <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 8px">If you tighten inspection (+20% cost, −5pp fail rate)</div>
+    <div class="cost-row"><span class="cost-label">New inspection cost</span><span class="cost-val">$${Math.round(tighterInspCost).toLocaleString()}</span></div>
+    <div class="cost-row"><span class="cost-label">New failure cost</span><span class="cost-val" style="color:var(--teal)">$${tighterFailCostM.toLocaleString()}</span></div>
+    <div class="cost-row"><span class="cost-label">New total</span><span class="cost-val">$${Math.round(tighterTotal).toLocaleString()}</span></div>
+    <div class="verdict ${savings>0?'verdict-pass':'verdict-fail'}" style="margin-top:12px">
+      <div class="verdict-text">${savings>0?'Saves $'+Math.round(savings).toLocaleString()+'/month':'No savings'}</div>
+      <div class="verdict-sub">${savings>0?'Tighter inspection pays for itself':'Current level is more cost-effective'}</div>
+    </div>`;
+
+  document.getElementById('cq-insight').innerHTML=savings>0
+    ?`Spending 20% more on inspections ($${Math.round(tighterInspCost-monthlyInspCost).toLocaleString()}/month) saves $${Math.round(savings).toLocaleString()}/month in avoided failures and re-inspections. The return on tighter quality control is ${Math.round(savings/(tighterInspCost-monthlyInspCost))}x the additional investment.`
+    :`At a ${Math.round(failRate*100)}% fail rate, the current inspection level is already cost-effective. The cost of tighter inspection exceeds the savings from fewer failures. Focus on root cause analysis rather than increasing inspection frequency.`;
+}
+
+// ── AQL Reference Table ──
+function buildAQLRef(){
+  const ref=[
+    ['2–8',2,'0/1','0/1'],['9–15',3,'0/1','0/1'],['16–25',5,'0/1','0/1'],
+    ['26–50',8,'0/1','1/2'],['51–90',13,'1/2','1/2'],['91–150',20,'1/2','2/3'],
+    ['151–280',32,'2/3','3/4'],['281–500',50,'3/4','5/6'],['501–1.2K',80,'5/6','7/8'],
+    ['1.2K–3.2K',125,'7/8','10/11'],['3.2K–10K',200,'10/11','14/15'],['10K–35K',315,'14/15','21/22']
+  ];
+  document.getElementById('aql-ref-table').innerHTML=ref.map(([lot,sample,maj,min])=>
+    `<tr style="border-bottom:0.5px solid var(--border)"><td style="padding:5px 4px;color:var(--text2)">${lot}</td><td style="text-align:center;padding:5px 4px;font-weight:500">${sample}</td><td style="text-align:center;padding:5px 4px">${maj}</td><td style="text-align:center;padding:5px 4px">${min}</td></tr>`
+  ).join('');
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+init();
+</script>
+</body>
+</html>
